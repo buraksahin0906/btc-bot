@@ -1,3 +1,4 @@
+import argparse
 import yfinance as yf
 import numpy as np
 import pandas as pd
@@ -16,8 +17,19 @@ from sklearn.preprocessing import StandardScaler
 # finansal tahmin modeli (AAAI 2026 kabul)
 # ==========================================
 
+parser = argparse.ArgumentParser(description="Kronos Hibrit Kripto Botu")
+parser.add_argument("sembol", nargs="?", default="BTC-USD",
+                    help="Kripto sembolü (örn: ETH-USD, SOL-USD, BNB-USD)")
+parser.add_argument("--sermaye", type=float, default=10000.0,
+                    help="Başlangıç sermayesi TL (varsayılan: 10000)")
+_args = parser.parse_args()
+
+SEMBOL          = _args.sembol.upper()
+if "-" not in SEMBOL:
+    SEMBOL = SEMBOL + "-USD"
+
 MODEL_DOSYASI   = "rsi_hunter_bot"
-BASLANGIC_SERMAYE = 10000.0
+BASLANGIC_SERMAYE = _args.sermaye
 KALDIRAC        = 3.0
 KOMISYON_ORANI  = 0.0005
 RSI_AL          = 35
@@ -140,7 +152,7 @@ def kronos_tahmin(df_4h):
 
 def veri_getir():
     try:
-        df = yf.download("BTC-USD", period="7d", interval="15m", progress=False)
+        df = yf.download(SEMBOL, period="7d", interval="15m", progress=False)
         if df.empty:
             raise ValueError("Yahoo Finance boş veri döndürdü.")
         if isinstance(df.columns, pd.MultiIndex):
@@ -195,7 +207,7 @@ def ekran_temizle():
 
 if __name__ == "__main__":
     print("=" * 54)
-    print("   KRONOS + RSI + PPO   HİBRİT BTC BOTU")
+    print(f"   KRONOS + RSI + PPO   HİBRİT BOT  [{SEMBOL}]")
     print("=" * 54)
 
     kronos_kur()
@@ -211,6 +223,8 @@ if __name__ == "__main__":
             print(f"⚠️  PPO yüklenemedi: {e}")
     else:
         print("⚠️  PPO model bulunamadı → Kronos+RSI modu aktif.")
+
+    print(f"📌 Sembol: {SEMBOL} | Başlangıç Sermaye: {BASLANGIC_SERMAYE:,.0f} TL")
 
     bakiye           = BASLANGIC_SERMAYE
     pozisyon         = False
@@ -266,7 +280,7 @@ if __name__ == "__main__":
             yon_emoji = "🟢" if gunluk > 0 else "🔴"
 
             print(f"┌──────────────────────────────────────────────────────┐")
-            print(f"│  ⏱️  {simdi}  │  BTC KRONOS HİBRİT BOT              │")
+            print(f"│  ⏱️  {simdi}  │  {SEMBOL} KRONOS HİBRİT BOT          │")
             print(f"└──────────────────────────────────────────────────────┘")
             print(f"  💲 Fiyat         : {anlik_fiyat:>12,.2f} $")
             print(f"  📊 Günlük Yön    : {yon_emoji}  %{gunluk * 100:+.2f}")
