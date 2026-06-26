@@ -1,0 +1,30 @@
+---
+# ================================================================
+# Freqtrade Docker Compose Dosyası
+# ================================================================
+# Bu dosya Freqtrade botunu Docker ile çalıştırır.
+# Kullanım: docker compose up -d
+# ================================================================
+
+version: '3'
+services:
+  freqtrade:
+    image: freqtradeorg/freqtrade:stable   # Resmi Freqtrade imajı
+    restart: unless-stopped                 # Bilgisayar açıldığında otomatik başlasın
+    container_name: freqtrade
+
+    # Klasör bağlantısı: sol taraf bilgisayar, sağ taraf Docker içi
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+
+    # Port bağlantısı: 8080 → FreqUI web arayüzü
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    # Bot başlatma komutu
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3.sqlite
+      --config /freqtrade/user_data/config.json
+      --strategy BasitStrateji
