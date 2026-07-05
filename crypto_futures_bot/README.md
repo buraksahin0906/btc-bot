@@ -31,6 +31,19 @@ Ayrıca canlı moda geçişte terminalde büyük harf **`LIVE`** onayı istenir.
 
 ## Kurulum
 
+### Kolay yol — kurulum sihirbazı (önerilen)
+
+Tek komut; kütüphaneleri kurar ve API anahtarlarını sorup `.env`'i senin yerine oluşturur:
+
+```bash
+cd crypto_futures_bot
+python kurulum.py
+```
+
+Sadece soruları cevapla. Paper modda başlamak istersen anahtar bile gerekmez.
+
+### Elle yol
+
 ```bash
 cd crypto_futures_bot
 pip install -r requirements.txt
