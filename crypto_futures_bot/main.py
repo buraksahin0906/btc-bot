@@ -21,6 +21,7 @@ import time
 from config import CONFIG, SECRETS
 from data.candle_fetcher import CandleFetcher
 from data.market_scanner import MarketScanner
+from data.price_stream import PriceFeed, PriceStream
 from exchange.okx_client import OKXClient
 from execution.order_manager import OrderManager
 from execution.position_manager import PositionManager
@@ -263,16 +264,8 @@ def scan_cycle(ctx) -> None:
     ctx["balance"] = balance
     state.reset_daily_if_new_day(balance)
 
-    # 2) Açık pozisyon varsa yönet, yeni işlem arama
-    open_pos = state.get_open_position()
-    if open_pos:
-        # Adopte edilmiş (borsadan devralınan) pozisyonda ct_val eksik olabilir
-        if not open_pos.get("ct_val"):
-            inst = ctx["scanner"].get_instrument(open_pos["symbol"])
-            if inst:
-                open_pos["ct_val"] = inst["ct_val"]
-                state.save_open_position(open_pos)
-        ctx["position_manager"].manage(open_pos)
+    # 2) Açık pozisyon varsa yeni işlem arama (yönetim hızlı döngüde yapılır)
+    if state.get_open_position():
         return
 
     # 3) Risk kapıları
@@ -316,6 +309,47 @@ def scan_cycle(ctx) -> None:
     try_open_trade(best, ctx)
 
 
+def manage_position_fast(ctx) -> None:
+    """Açık pozisyonu HIZLI döngüde yönetir (küçük-hedef scalping için kritik).
+
+    30 sn'lik tarama yerine, pozisyon açıkken her manage_interval_seconds'ta
+    (varsayılan 1 sn) WS akış fiyatıyla trailing/stop kontrol edilir. Pozisyon
+    kapanınca (manage None döner) taramaya geri dönülür.
+    """
+    log = ctx["log"]
+    state: StateStore = ctx["state"]
+    pos = state.get_open_position()
+    if not pos:
+        return
+
+    # Bu sembolün anlık fiyat akışına abone ol
+    ctx["price_feed"].ensure_subscribed(pos["symbol"])
+
+    # Adopte edilmiş (borsadan devralınan) pozisyonda ct_val eksik olabilir
+    if not pos.get("ct_val"):
+        inst = ctx["scanner"].get_instrument(pos["symbol"])
+        if inst:
+            pos["ct_val"] = inst["ct_val"]
+            state.save_open_position(pos)
+
+    src = ctx["price_feed"].source_of(pos["symbol"])
+    log.info(f"Hızlı yönetim başladı: {pos['symbol']} {pos['direction'].upper()} "
+             f"(fiyat kaynağı: {src}, tick {CONFIG.manage_interval_seconds}s)")
+
+    while True:
+        pos = state.get_open_position()
+        if pos is None:
+            return  # pozisyon kapandı → taramaya dön
+        try:
+            result = ctx["position_manager"].manage(pos)
+        except Exception as exc:  # noqa: BLE001 — yönetim asla çökmesin
+            log.error(f"Yönetim tick hatası (devam): {exc}", exc_info=True)
+            result = pos
+        if result is None:
+            return
+        time.sleep(CONFIG.manage_interval_seconds)
+
+
 # ======================================================================
 # Giriş noktası
 # ======================================================================
@@ -344,8 +378,18 @@ def main() -> None:
     fetcher = CandleFetcher(exchange, logger)
     risk = RiskManager(state)
     orders = OrderManager(exchange, paper, live, logger)
+
+    # Canlı fiyat akışı (WS) + REST fallback'li fiyat kaynağı
+    stream = None
+    if CONFIG.use_websocket:
+        ws_url = CONFIG.ws_public_url_demo if SECRETS.okx_demo else CONFIG.ws_public_url
+        stream = PriceStream(ws_url, logger)
+        stream.start()
+    price_feed = PriceFeed(exchange, stream, logger)
+
     position_manager = PositionManager(
-        exchange, orders, paper, state, risk, trade_logger, notifier, live, logger
+        exchange, orders, paper, state, risk, trade_logger, notifier, live, logger,
+        price_feed=price_feed,
     )
 
     scanner.load_instruments()
@@ -355,7 +399,7 @@ def main() -> None:
         "exchange": exchange, "state": state, "paper": paper, "notifier": notifier,
         "scanner": scanner, "fetcher": fetcher, "risk": risk, "orders": orders,
         "position_manager": position_manager, "live": live, "log": logger,
-        "balance": 0.0,
+        "price_feed": price_feed, "stream": stream, "balance": 0.0,
     }
 
     logger.info(f"Başlangıç bakiyesi: {get_balance(exchange, paper, live):.2f} USDT")
@@ -363,15 +407,27 @@ def main() -> None:
 
     try:
         while True:
+            # Açık pozisyon varsa önce onu HIZLI yönet (kapanana kadar tight loop)
+            if state.get_open_position():
+                manage_position_fast(ctx)
+                continue  # kapandı → beklemeden yeni tarama
+
             try:
                 scan_cycle(ctx)
             except Exception as exc:  # noqa: BLE001 — döngü asla çökmesin
                 logger.error(f"Döngü hatası (devam ediliyor): {exc}", exc_info=True)
                 time.sleep(5)
-            time.sleep(CONFIG.scan_interval_seconds)
+
+            # Tarama bir pozisyon açtıysa beklemeden hızlı yönetime geç
+            if state.get_open_position():
+                manage_position_fast(ctx)
+            else:
+                time.sleep(CONFIG.scan_interval_seconds)
     except KeyboardInterrupt:
         logger.info("CTRL+C — bot durduruluyor.")
     finally:
+        if stream is not None:
+            stream.stop()
         stats = state.get_trade_stats()
         logger.info("-" * 54)
         logger.info(f"Özet: {stats['trades']} işlem | win rate {stats['win_rate']:.1f}% | "

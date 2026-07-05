@@ -100,6 +100,13 @@ class Config:
     # --- Bakiye (paper mod başlangıç sermayesi) ---
     paper_starting_balance: float = 164.0
 
+    # --- Canlı fiyat akışı (WebSocket) + hızlı yönetim ---
+    use_websocket: bool = True                 # açık pozisyonda anlık fiyat akışı
+    ws_public_url: str = "wss://ws.okx.com:8443/ws/v5/public"
+    ws_public_url_demo: str = "wss://wspap.okx.com:8443/ws/v5/public"
+    manage_interval_seconds: float = 1.0       # açık pozisyon yönetim tick'i (hızlı döngü)
+    price_staleness_seconds: float = 3.0       # akış fiyatı bundan eskiyse REST'e düş
+
     # --- Zaman dilimleri (OKX bar kodları) ---
     tf_trend: str = "15m"   # ana trend yönü
     tf_entry: str = "5m"    # giriş sinyali

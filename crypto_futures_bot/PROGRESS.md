@@ -39,8 +39,12 @@ okut** — tüm bağlam burada. (Sohbet hafızası taşınmaz; kod ve bu notlar 
   **candle_fetcher** (cache + BTC bias).
 - **Loglama**: `bot.log` (döner) + `trades.csv` + paper özet istatistik.
 - **Çift katmanlı güvenlik** + `LIVE` terminal onayı — doğruluk tablosu test edildi.
+- **WebSocket canlı fiyat akışı + hızlı yönetim döngüsü** (`data/price_stream.py`):
+  küçük-hedef scalping için açık pozisyonda fiyat 30 sn'de bir değil, WS'ten
+  değiştikçe okunur; trailing/stop her ~1 sn kontrol edilir. WS erişilemezse
+  otomatik REST fallback (bot çökmez). **Birim testli.**
 - **Testler**: `tests/test_indicators.py`, `tests/test_trailing.py`,
-  `tests/smoke_e2e.py` — **hepsi geçiyor**.
+  `tests/test_price_stream.py`, `tests/smoke_e2e.py` — **hepsi geçiyor**.
 
 ## İSKELET kalanlar (PC'de detaylandırılacak)
 
@@ -51,6 +55,9 @@ okut** — tüm bağlam burada. (Sohbet hafızası taşınmaz; kod ve bu notlar 
    formatlama minimal. Eksik: zengin sinyal kartları, /status komutu, hata uyarıları.
 3. **Canlı emir yolu**: `OKXClient` private uçları yazıldı ama **gerçek OKX hesabında
    test edilmedi** (bu ortamdan erişim yoktu). PC'de önce `OKX_DEMO=true` ile doğrula.
+4. **WebSocket akışı**: mantık yazıldı + REST fallback test edildi, ama gerçek OKX
+   WS bağlantısı bu ortamdan (ağ engeli) test edilmedi. PC'de ilk koşuda logda
+   "fiyat kaynağı: ws" görmelisin (görmüyorsan REST'e düşmüştür — yine çalışır).
 
 ## PC'de İLK yapılacaklar (sırayla)
 
@@ -73,5 +80,6 @@ okut** — tüm bağlam burada. (Sohbet hafızası taşınmaz; kod ve bu notlar 
 - **Funding:** Şu an yaklaşık (`≈`) hesaplanıyor; kesin funding OKX'ten çekilebilir.
 - **Tarama kapsamı:** Her döngü en likit `max_symbols_per_scan=15` coin taranır
   (API tasarrufu). Artırmak istersen `config.py`.
-- **1m yönetim:** Şu an açık pozisyon her tarama döngüsünde (30 sn) bir yönetiliyor.
-  Daha sık trailing için PC'de ayrı 1m alt-döngü eklenebilir.
+- **Hızlı yönetim:** Açık pozisyon varken tarama durur, pozisyon
+  `manage_interval_seconds=1` sn'de bir WS fiyatıyla yönetilir (scalping için).
+  Daha da hızlı istersen bu değeri düşür (0.3 gibi) ama OKX rate-limit'e dikkat.

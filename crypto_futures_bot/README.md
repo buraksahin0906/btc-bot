@@ -78,7 +78,8 @@ ile test etmen şiddetle önerilir.**
 main.py              → döngü orkestrasyonu (her 30 sn tarama)
 config.py            → tüm ayarlar + .env
 exchange/            → BaseExchange (soyut) + OKXClient (V5 REST)
-data/                → market_scanner (likidite/spread), candle_fetcher (15m/5m/1m)
+data/                → market_scanner (likidite/spread), candle_fetcher (15m/5m/1m),
+                       price_stream (WebSocket anlık fiyat + REST fallback)
 strategy/            → indicators (saf pandas/numpy), scoring, trend_filter, signal_engine
 risk/                → risk_manager (günlük zarar, cooldown, R/R), position_sizer (%2, 2x)
 execution/           → order_manager (maker→market), position_manager (net hedef + trailing)
@@ -108,13 +109,16 @@ eden yeni bir sınıf yaz (ör. `BinanceClient`), `main.build_exchange()`'i gün
   kilitlenir). Hedefe ulaşınca trailing başlar; tepeden geri gelince **tam** çıkış.
 - **Melez stop:** Borsada asılı reduce-only stop-market (bot çökse bile korur) +
   bot tarafında trailing. Hedef kilitlenince stop bir kez girişe çekilir (risksiz).
+- **Hız (scalping):** Açık pozisyonda fiyat **WebSocket** ile anlık akar; trailing/stop
+  ~1 sn'de bir kontrol edilir (30 sn tarama yerine). WS düşerse otomatik REST fallback.
 
 ## Testler
 
 ```bash
-python tests/test_indicators.py   # indikatör doğrulaması
-python tests/test_trailing.py     # net hedef + trailing + stop yaşam döngüsü
-python tests/smoke_e2e.py         # mock borsayla uçtan uca boru hattı
+python tests/test_indicators.py    # indikatör doğrulaması
+python tests/test_trailing.py      # net hedef + trailing + stop yaşam döngüsü
+python tests/test_price_stream.py  # WebSocket akış + REST fallback
+python tests/smoke_e2e.py          # mock borsayla uçtan uca boru hattı
 ```
 
 ## Config'de öne çıkan ayarlar (`config.py`)

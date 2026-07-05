@@ -27,7 +27,8 @@ from config import CONFIG
 
 class PositionManager:
     def __init__(self, exchange, order_manager, paper_trader, state_store,
-                 risk_manager, trade_logger, notifier, is_live: bool, logger):
+                 risk_manager, trade_logger, notifier, is_live: bool, logger,
+                 price_feed=None):
         self.exchange = exchange
         self.orders = order_manager
         self.paper = paper_trader
@@ -37,6 +38,14 @@ class PositionManager:
         self.notifier = notifier
         self.is_live = is_live
         self.log = logger
+        # price_feed: WS-öncelikli fiyat kaynağı. None ise doğrudan REST ticker.
+        self.price_feed = price_feed
+
+    def _read_price(self, symbol: str) -> float:
+        """En güncel fiyat: price_feed (WS→REST) varsa ondan, yoksa REST ticker."""
+        if self.price_feed is not None:
+            return self.price_feed.get_price(symbol)
+        return self.exchange.get_ticker(symbol)["last"]
 
     # ------------------------------------------------------------------
     # Net kâr hesabı (komisyon + yaklaşık funding dahil)
@@ -85,9 +94,9 @@ class PositionManager:
         symbol = pos["symbol"]
         direction = pos["direction"]
 
-        # 1) Önce güncel fiyat
+        # 1) Önce güncel fiyat (WS akışı → bayatsa REST). Yarış önleme: karardan önce.
         try:
-            price = self.exchange.get_ticker(symbol)["last"]
+            price = self._read_price(symbol)
         except Exception as exc:  # noqa: BLE001
             self.log.warning(f"{symbol} fiyat okunamadı, tick atlanıyor: {exc}")
             return pos
