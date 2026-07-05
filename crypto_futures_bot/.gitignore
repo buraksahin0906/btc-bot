@@ -1,0 +1,21 @@
+# Gizli anahtarlar — ASLA commit edilmez
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Veritabanı ve loglar (yerelde üretilir)
+*.db
+*.sqlite
+*.sqlite3
+logs/*.log
+logs/*.csv
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db
