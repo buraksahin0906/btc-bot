@@ -1,0 +1,5 @@
+*.bat
+index.template.html
+KULLANIM.txt
+.vercel
+node_modules

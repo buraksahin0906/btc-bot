@@ -1,0 +1,49 @@
+╔══════════════════════════════════════════════════════════╗
+║   CANLI YAZI TABELASI — Vercel'e yayınlama (Windows)       ║
+╚══════════════════════════════════════════════════════════╝
+
+Ne yapıyor?
+  TABELA.bat'a çift tıklarsın → "Ekranda ne yazsın?" diye sorar →
+  yazdığını internete (Vercel) yükler → sana bir link verir.
+  O linki telefondan, başka bilgisayardan, herkes açabilir.
+
+
+────────────────────────────────────────────
+İLK KEZ (tek seferlik hazırlık)
+────────────────────────────────────────────
+1) Node.js kur:  https://nodejs.org  → "LTS" sürümünü indir, kur.
+   (Kurulumda hep "Next/İleri" yeterli.)
+
+2) Vercel hesabı aç (ücretsiz):  https://vercel.com  → "Sign Up"
+   → Google veya GitHub ile giriş yapman en kolayı.
+
+3) Bu klasörü Masaüstüne çıkar (zip'ten çıkardıysan).
+
+
+────────────────────────────────────────────
+KULLANIM (her seferinde)
+────────────────────────────────────────────
+1) TABELA.bat dosyasına ÇİFT TIKLA.
+
+2) "Ekranda ne yazsın" diye sorunca yazını yaz, Enter'a bas.
+
+3) İLK ÇALIŞTIRMADA: Vercel giriş ekranı gelir.
+   - "Log in to Vercel" → ok tuşuyla GitHub/Google seç, Enter.
+   - Tarayıcı açılır, "Confirm" de. Sonra pencereye geri dön.
+   - Birkaç soru çıkarsa hepsine Enter (varsayılanlar uygun).
+
+4) Bitince ekranda şuna benzer bir link görürsün:
+        https://tabela-xxxx.vercel.app
+   Bu linki telefonda/başka cihazda aç — yazın orada!
+
+5) Yazıyı değiştirmek istersen: TABELA.bat'ı tekrar çalıştır,
+   yeni yazını yaz. AYNI link güncellenir.
+
+
+────────────────────────────────────────────
+Takılırsan
+────────────────────────────────────────────
+- "Node.js bulunamadi" yazıyorsa: 1. adımı yap (Node.js kur), bilgisayarı
+  yeniden başlat, tekrar dene.
+- Türkçe karakterler bozuk görünürse sorun değil; yayınlanan sayfada
+  (vercel.app linkinde) düzgün görünür.
