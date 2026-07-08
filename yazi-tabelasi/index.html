@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Canlı Yazı Tabelası</title>
+<style>
+  :root {
+    --panel-bg: #16181d;
+    --panel-border: #2a2e37;
+    --accent: #4f8cff;
+    --text-dim: #9aa3b2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0d0e11;
+    color: #e7eaf0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ---- Kontrol paneli ---- */
+  #panel {
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--panel-border);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+    transition: transform .25s ease, opacity .25s ease;
+  }
+  #panel textarea {
+    width: 100%;
+    resize: none;
+    min-height: 54px;
+    max-height: 120px;
+    padding: 10px 12px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border);
+    background: #0f1116;
+    color: #e7eaf0;
+    outline: none;
+  }
+  #panel textarea:focus { border-color: var(--accent); }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+  }
+  .ctrl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .ctrl input[type="color"] {
+    width: 34px; height: 30px; padding: 0;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px; background: none; cursor: pointer;
+  }
+  .ctrl input[type="range"] { width: 120px; accent-color: var(--accent); }
+
+  .btn {
+    border: 1px solid var(--panel-border);
+    background: #21252e;
+    color: #e7eaf0;
+    padding: 8px 14px;
+    border-radius: 9px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .btn:hover { background: #2a2f3a; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+
+  .themes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatch {
+    width: 30px; height: 30px; border-radius: 8px;
+    cursor: pointer; border: 2px solid transparent;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .swatch:hover { border-color: var(--accent); }
+
+  /* ---- Tabela alanı ---- */
+  #stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+  }
+  #board {
+    font-weight: 800;
+    line-height: 1.05;
+    max-width: 100%;
+    word-break: break-word;
+    white-space: pre-wrap;
+    letter-spacing: -0.01em;
+  }
+
+  /* Kayan yazı modu */
+  #stage.marquee { overflow: hidden; }
+  #stage.marquee #board {
+    white-space: nowrap;
+    will-change: transform;
+    animation: scroll-left var(--marquee-dur, 12s) linear infinite;
+  }
+  @keyframes scroll-left {
+    from { transform: translateX(100vw); }
+    to   { transform: translateX(-100%); }
+  }
+
+  /* Tam ekran / sunum modu: paneli gizle */
+  body.present #panel { transform: translateY(-100%); opacity: 0; height: 0; padding: 0; border: none; pointer-events: none; }
+  #hint {
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: var(--text-dim); opacity: .6;
+    background: rgba(0,0,0,.3); padding: 5px 12px; border-radius: 20px;
+    pointer-events: none; transition: opacity .3s;
+  }
+  body:not(.present) #hint { display: none; }
+</style>
+</head>
+<body>
+  <div id="panel">
+    <textarea id="input" placeholder="Buraya yaz → ekranda görünür..." autofocus></textarea>
+    <div class="row">
+      <span class="ctrl">Yazı<input type="color" id="fg" value="#ffffff"></span>
+      <span class="ctrl">Zemin<input type="color" id="bg" value="#0d0e11"></span>
+      <span class="ctrl">Boyut<input type="range" id="size" min="4" max="40" step="0.5" value="14"></span>
+      <span class="ctrl"><label><input type="checkbox" id="marquee"> Kayan yazı</label></span>
+      <div class="themes" id="themes"></div>
+      <button class="btn" id="clearBtn">Temizle</button>
+      <button class="btn primary" id="fsBtn">Tam Ekran ▶</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <div id="board"></div>
+    <div id="hint">Kontroller için ekrana dokun · çıkmak için ESC</div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const input = $("input"), board = $("board"), stage = $("stage");
+  const fg = $("fg"), bg = $("bg"), size = $("size"), marquee = $("marquee");
+  const KEY = "yazi-tabelasi-v1";
+
+  const DEFAULT_TEXT = "Buraya yaz → ekranda görünür";
+
+  const themes = [
+    { name: "B", fg: "#ffffff", bg: "#0d0e11" }, // beyaz / siyah
+    { name: "S", fg: "#111111", bg: "#ffffff" }, // siyah / beyaz
+    { name: "⚡", fg: "#0d0e11", bg: "#ffd400" }, // siyah / sarı
+    { name: "♥", fg: "#ffffff", bg: "#e0245e" }, // beyaz / kırmızı
+    { name: "☘", fg: "#eafff0", bg: "#0a7d3c" }, // yeşil
+    { name: "◆", fg: "#00e5ff", bg: "#04121a" }, // neon
+  ];
+
+  // Tema butonlarını oluştur
+  const themesWrap = $("themes");
+  themes.forEach((t) => {
+    const el = document.createElement("div");
+    el.className = "swatch";
+    el.style.background = t.bg;
+    el.style.color = t.fg;
+    el.textContent = t.name;
+    el.title = "Tema";
+    el.addEventListener("click", () => {
+      fg.value = t.fg; bg.value = t.bg;
+      apply(); save();
+    });
+    themesWrap.appendChild(el);
+  });
+
+  // Metni ekrana sığacak şekilde otomatik ölçekle
+  function autoFit() {
+    if (marquee.checked) return; // kayan modda ölçekleme yok
+    const maxVw = parseFloat(size.value); // kullanıcı üst sınırı (vw)
+    let fs = maxVw;
+    board.style.fontSize = fs + "vw";
+    // Taşma varsa küçült
+    let guard = 0;
+    while (
+      guard++ < 200 &&
+      (board.scrollWidth > stage.clientWidth - 40 ||
+       board.scrollHeight > stage.clientHeight - 40) &&
+      fs > 1
+    ) {
+      fs -= 0.5;
+      board.style.fontSize = fs + "vw";
+    }
+  }
+
+  function apply() {
+    const text = input.value.length ? input.value : DEFAULT_TEXT;
+    board.textContent = text;
+    board.style.color = fg.value;
+    document.body.style.background = bg.value;
+    stage.style.background = bg.value;
+    if (marquee.checked) {
+      stage.classList.add("marquee");
+      board.style.fontSize = size.value + "vw";
+      // kayma süresi metin uzunluğuna göre
+      const dur = Math.max(6, text.length * 0.35);
+      stage.style.setProperty("--marquee-dur", dur + "s");
+    } else {
+      stage.classList.remove("marquee");
+      autoFit();
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        text: input.value, fg: fg.value, bg: bg.value,
+        size: size.value, marquee: marquee.checked,
+      }));
+    } catch (e) { /* localStorage kapalı olabilir */ }
+  }
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+      if (s.text != null) input.value = s.text;
+      if (s.fg) fg.value = s.fg;
+      if (s.bg) bg.value = s.bg;
+      if (s.size) size.value = s.size;
+      if (s.marquee) marquee.checked = s.marquee;
+    } catch (e) { /* yoksay */ }
+  }
+
+  // Sunum (tam ekran) modu
+  function enterPresent() {
+    document.body.classList.add("present");
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    apply();
+  }
+  function exitPresent() {
+    document.body.classList.remove("present");
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    apply();
+    setTimeout(() => input.focus(), 100);
+  }
+  function togglePresentByTap() {
+    if (document.body.classList.contains("present")) exitPresent();
+  }
+
+  // Olaylar
+  [input, fg, bg, size].forEach((el) =>
+    el.addEventListener("input", () => { apply(); save(); }));
+  marquee.addEventListener("change", () => { apply(); save(); });
+  $("fsBtn").addEventListener("click", enterPresent);
+  $("clearBtn").addEventListener("click", () => { input.value = ""; apply(); save(); input.focus(); });
+  stage.addEventListener("click", togglePresentByTap);
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) document.body.classList.remove("present"), apply();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") exitPresent();
+    if (e.key === "F2") enterPresent();
+  });
+  window.addEventListener("resize", apply);
+
+  // Başlangıç
+  load();
+  apply();
+})();
+</script>
+</body>
+</html>
